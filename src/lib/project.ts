@@ -180,31 +180,22 @@ export async function createProject(name: string, userId: string, description?: 
     const dockerComposeFile = path.join(projectDir, 'docker', 'docker-compose.yml')
     let dockerComposeContent = await fs.readFile(dockerComposeFile, 'utf8')
     
-    // Replace container names with project-specific names
-    const containerMappings = [
-      { original: 'supabase-studio', replacement: `${slug}-studio` },
-      { original: 'supabase-kong', replacement: `${slug}-kong` },
-      { original: 'supabase-auth', replacement: `${slug}-auth` },
-      { original: 'supabase-rest', replacement: `${slug}-rest` },
-      { original: 'realtime-dev.supabase-realtime', replacement: `realtime-dev.${slug}-realtime` },
-      { original: 'supabase-storage', replacement: `${slug}-storage` },
-      { original: 'supabase-imgproxy', replacement: `${slug}-imgproxy` },
-      { original: 'supabase-meta', replacement: `${slug}-meta` },
-      { original: 'supabase-edge-functions', replacement: `${slug}-edge-functions` },
-      { original: 'supabase-analytics', replacement: `${slug}-analytics` },
-      { original: 'supabase-db', replacement: `${slug}-db` },
-      { original: 'supabase-vector', replacement: `${slug}-vector` },
-      { original: 'supabase-pooler', replacement: `${slug}-pooler` }
-    ]
-    
-    // Replace container names in the compose file
-    for (const mapping of containerMappings) {
-      dockerComposeContent = dockerComposeContent.replace(
-        new RegExp(`container_name: ${mapping.original}`, 'g'),
-        `container_name: ${mapping.replacement}`
-      )
-    }
-    
+    // Rewrite every container_name, rather than a fixed list of known ones.
+    // Upstream renames services (kong -> api-gw, container_name supabase-envoy),
+    // and any name missed here keeps its generic value in every project, so the
+    // second project fails to start on a duplicate container name.
+    dockerComposeContent = dockerComposeContent.replace(
+      /^(\s*container_name:\s*)(\S+)\s*$/gm,
+      (_match: string, prefix: string, containerName: string) => {
+        if (containerName.includes(slug)) return `${prefix}${containerName}`
+        // realtime requires its "realtime-dev." prefix to stay leftmost
+        const parts = containerName.match(/^(realtime-dev\.)?(?:supabase-)?(.+)$/)
+        const lead = parts?.[1] ?? ''
+        const service = parts?.[2] ?? containerName
+        return `${prefix}${lead}${slug}-${service}`
+      }
+    )
+
     // Update the compose project name to be unique
     dockerComposeContent = dockerComposeContent.replace(
       /^name: supabase$/m,
