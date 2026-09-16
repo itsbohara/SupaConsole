@@ -42,3 +42,8 @@ next-env.d.ts
 /supabase-projects
 
 .env
+# Prisma dev database. Upstream committed this file with a real user account
+# in it; a tracked auth database ships someone else's credentials to every
+# clone and is overwritten on every pull.
+prisma/*.db
+prisma/*.db-journal
