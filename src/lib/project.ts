@@ -127,9 +127,15 @@ export async function initializeSupabaseCore() {
     // Clone repository if supabase-core doesn't exist
     if (!coreExists) {
       const repoUrl = process.env.SUPABASE_CORE_REPO_URL || 'https://github.com/supabase/supabase'
-      
+      const repoRef = process.env.SUPABASE_CORE_REF
+
+      // Without a ref this follows master, so two projects created weeks apart
+      // can be built from different Supabase versions, and there is no release
+      // to roll back to when master ships a regression.
+      const refArg = repoRef ? `--branch ${repoRef} ` : ''
+
       // Use shallow clone for faster download
-      await execAsync(`git clone --depth 1 ${repoUrl} supabase-core`)
+      await execAsync(`git clone --depth 1 ${refArg}${repoUrl} supabase-core`)
     }
     
     return { success: true }
