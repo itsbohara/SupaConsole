@@ -6,6 +6,12 @@ import { prisma } from './db'
 
 const execAsync = promisify(exec)
 
+// Root for supabase-core and supabase-projects. Defaults to the app directory
+// for backwards compatibility, but that puts Postgres data dirs (created root
+// owned by the container) inside the Next.js project, and `next build` then
+// fails scanning them once any project exists. Point this outside the app.
+const dataRoot = () => process.env.SUPACONSOLE_DATA_DIR || process.cwd()
+
 // Helper functions for generating secure defaults
 function generateRandomString(length: number): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -111,8 +117,8 @@ async function checkInternetConnectivity(): Promise<boolean> {
 }
 
 export async function initializeSupabaseCore() {
-  const coreDir = path.join(process.cwd(), 'supabase-core')
-  const projectsDir = path.join(process.cwd(), 'supabase-projects')
+  const coreDir = path.join(dataRoot(), 'supabase-core')
+  const projectsDir = path.join(dataRoot(), 'supabase-projects')
   
   try {
     // Check if directories already exist
@@ -162,8 +168,8 @@ export async function createProject(name: string, userId: string, description?: 
     })
     
     // Create project directory
-    const projectDir = path.join(process.cwd(), 'supabase-projects', slug)
-    const coreDockerDir = path.join(process.cwd(), 'supabase-core', 'docker')
+    const projectDir = path.join(dataRoot(), 'supabase-projects', slug)
+    const coreDockerDir = path.join(dataRoot(), 'supabase-core', 'docker')
     
     // Copy docker folder from supabase-core
     await fs.mkdir(projectDir, { recursive: true })
@@ -325,7 +331,7 @@ export async function updateProjectEnvVars(projectId: string, envVars: Record<st
     }
     
     // Update .env file in project directory
-    const projectDir = path.join(process.cwd(), 'supabase-projects', project.slug, 'docker')
+    const projectDir = path.join(dataRoot(), 'supabase-projects', project.slug, 'docker')
     const envFilePath = path.join(projectDir, '.env')
     
     const envContent = Object.entries(envVars)
@@ -351,7 +357,7 @@ export async function deployProject(projectId: string) {
       throw new Error('Project not found')
     }
     
-    const projectDir = path.join(process.cwd(), 'supabase-projects', project.slug, 'docker')
+    const projectDir = path.join(dataRoot(), 'supabase-projects', project.slug, 'docker')
     
     // Run pre-flight checks
     console.log('Running pre-flight checks...')
@@ -447,7 +453,7 @@ export async function pauseProject(projectId: string) {
       throw new Error('Project not found')
     }
     
-    const projectDir = path.join(process.cwd(), 'supabase-projects', project.slug, 'docker')
+    const projectDir = path.join(dataRoot(), 'supabase-projects', project.slug, 'docker')
     
     // Stop Docker containers
     await execAsync('docker compose stop', { cwd: projectDir })
@@ -475,7 +481,7 @@ export async function deleteProject(projectId: string) {
       throw new Error('Project not found')
     }
     
-    const projectDir = path.join(process.cwd(), 'supabase-projects', project.slug)
+    const projectDir = path.join(dataRoot(), 'supabase-projects', project.slug)
     const dockerDir = path.join(projectDir, 'docker')
     
     // Step 1: Stop and remove Docker containers
